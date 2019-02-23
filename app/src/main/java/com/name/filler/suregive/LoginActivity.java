@@ -171,6 +171,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         ObjectAnimator slideRight = ObjectAnimator.ofFloat(findViewById(R.id.options), "translationX", 1300f);
         slideRight.setDuration(1000);
         slideRight.start();
+        //
 
     }
 
