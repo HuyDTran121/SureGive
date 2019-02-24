@@ -424,17 +424,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     }
     private void getProfilePic(){
         //TODO implement pictures
-        Intent galleryIntent = new Intent(Intent.ACTION_PICK,
-                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-
-        Intent cameraIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-
-        Intent chooser = new Intent(Intent.ACTION_CHOOSER);
-        chooser.putExtra(Intent.EXTRA_INTENT, galleryIntent);
-        chooser.putExtra(Intent.EXTRA_TITLE, "Get Picture");
-
-        Intent[] intentArray =  {cameraIntent};
-        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray);
 
         //startActivity(chooser);
         startActivityForResult(getPickImageChooserIntent(),1);
