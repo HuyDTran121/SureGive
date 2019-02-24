@@ -4,15 +4,19 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.annotation.TargetApi;
+import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
+import android.content.pm.ResolveInfo;
+import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
-import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.Snackbar;
 import android.support.design.widget.TextInputEditText;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.app.LoaderManager.LoaderCallbacks;
 
@@ -40,6 +44,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -84,21 +91,22 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private static final int RECEIVER = 1;
     private int mode;
     //Receiver input elements
+    private TextInputEditText authKey;
     private TextView name;
     private TextInputEditText nameInput;
     private TextView bio;
     private TextInputEditText bioInput;
     private Button addPhoto;
-    private Button next;
+    private Button submit;
     //Layouts
     private LinearLayout verticalLayout;
     private LinearLayout giveOrReceive;
     private LinearLayout options;
     private LinearLayout receiverInput;
     //Images
-    private Bitmap profilePic;
-    private Bitmap image1;
-    private Bitmap image2;
+    private byte[] profilePic;
+    private byte[] image1;
+    private byte[] image2;
 
 
     @Override
@@ -248,7 +256,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 disappear.setDuration(0);
                 giveOrReceive.startAnimation(disappear);
                 //Add fade in
-                verticalLayout.addView(giveOrReceive, 2);
+                verticalLayout.addView(giveOrReceive, 3);
                 Animation fadeIn = new AlphaAnimation(0, 1);
                 fadeIn.setDuration(700);
                 giveOrReceive.startAnimation(fadeIn);
@@ -276,12 +284,19 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         //Layout Parameter
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.FILL_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
+        //Authentication Token
+        authKey = new TextInputEditText(this);
+        authKey.setLayoutParams(params);
+        authKey.setHint("Authentication Key");
+        receiverInput.addView(authKey);
+
         //Name
         name = new TextView(this);
         name.setText("Name:");
         //Name input
         nameInput = new TextInputEditText(this);
         nameInput.setLayoutParams(params);
+        nameInput.setHint("First and Last Name");
 
         LinearLayout nameLayout = new LinearLayout(this);
         receiverInput.addView(nameLayout);
@@ -296,6 +311,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         //Bio input
         bioInput = new TextInputEditText(this);
         bioInput.setLayoutParams(params);
+        bioInput.setHint("Tell us about yourself");
         bioInput.setLines(2);
 
         LinearLayout bioLayout = new LinearLayout(this);
@@ -314,16 +330,26 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         addPhoto = new Button(this);
         addPhoto.setLayoutParams(params);
-        addPhoto.setGravity(Gravity.RIGHT);
         addPhoto.setText("Add Profile Photo");
         addPhoto.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                getPhoto();
+                getProfilePic();
             }
         });
         receiverInput.addView(addPhoto);
 
+        //Submit
+        submit = new Button(this);
+        submit.setText("Submit");
+        submit.setLayoutParams(params);
+        submit.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //TODO click submit
+            }
+        });
+        receiverInput.addView(submit);
 
         slideRight.addListener(new AnimatorListenerAdapter() {
             @Override
@@ -334,7 +360,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 disappear.setDuration(0);
                 receiverInput.startAnimation(disappear);
                 //Add fade in
-                verticalLayout.addView(receiverInput, 2);
+                verticalLayout.addView(receiverInput, 3);
                 Animation fadeIn = new AlphaAnimation(0, 1);
                 fadeIn.setDuration(700);
                 receiverInput.startAnimation(fadeIn);
@@ -345,8 +371,58 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
 
     }
+    private Uri getCaptureImageOutputUri() {
+        Uri outputFileUri = null;
+        File getImage = getExternalFilesDir("");
+        if (getImage != null) {
+            outputFileUri = Uri.fromFile(new File(getImage.getPath(), "profile.png"));
+        }
+        return outputFileUri;
+    }
+    public Intent getPickImageChooserIntent() {
 
-    private void getPhoto(){
+        Uri outputFileUri = getCaptureImageOutputUri();
+
+        List<Intent> allIntents = new ArrayList<>();
+        PackageManager packageManager = getPackageManager();
+
+        Intent captureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+        List<ResolveInfo> listCam = packageManager.queryIntentActivities(captureIntent, 0);
+        for (ResolveInfo res : listCam) {
+            Intent intent = new Intent(captureIntent);
+            intent.setComponent(new ComponentName(res.activityInfo.packageName, res.activityInfo.name));
+            intent.setPackage(res.activityInfo.packageName);
+            if (outputFileUri != null) {
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, outputFileUri);
+            }
+            allIntents.add(intent);
+        }
+
+        Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
+        galleryIntent.setType("image/*");
+        List<ResolveInfo> listGallery = packageManager.queryIntentActivities(galleryIntent, 0);
+        for (ResolveInfo res : listGallery) {
+            Intent intent = new Intent(galleryIntent);
+            intent.setComponent(new ComponentName(res.activityInfo.packageName, res.activityInfo.name));
+            intent.setPackage(res.activityInfo.packageName);
+            allIntents.add(intent);
+        }
+
+        Intent mainIntent = allIntents.get(allIntents.size() - 1);
+        for (Intent intent : allIntents) {
+            if (intent.getComponent().getClassName().equals("com.android.documentsui.DocumentsActivity")) {
+                mainIntent = intent;
+                break;
+            }
+        }
+        allIntents.remove(mainIntent);
+
+        Intent chooserIntent = Intent.createChooser(mainIntent, "Select source");
+        chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, allIntents.toArray(new Parcelable[allIntents.size()]));
+
+        return chooserIntent;
+    }
+    private void getProfilePic(){
         //TODO implement pictures
         Intent galleryIntent = new Intent(Intent.ACTION_PICK,
                 android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -359,8 +435,65 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         Intent[] intentArray =  {cameraIntent};
         chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray);
-        startActivity(chooser);
+
+        //startActivity(chooser);
+        startActivityForResult(getPickImageChooserIntent(),1);
+
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+
+        if (resultCode == Activity.RESULT_OK) {
+
+            //ImageView imageView = findViewById(R.id.imageView);
+
+            if (requestCode == 1) {
+
+                String filePath = getImageFilePath(intent);
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    try{
+                        byte[] byteArr = new byte[(int)file.length()];
+                        BufferedInputStream inputStream = new BufferedInputStream(new FileInputStream(file));
+                        inputStream.read(byteArr,0,byteArr.length);
+                        inputStream.close();
+                        profilePic = byteArr;
+
+                    }
+                    catch (Exception e){
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+        }
+    }
+
+    private String getImageFromFilePath(Intent data) {
+        boolean isCamera = data == null || data.getData() == null;
+
+        if (isCamera) return getCaptureImageOutputUri().getPath();
+        else return getPathFromURI(data.getData());
+
+    }
+
+    public String getImageFilePath(Intent data) {
+        return getImageFromFilePath(data);
+    }
+
+    private String getPathFromURI(Uri contentUri) {
+        String[] proj = {MediaStore.Audio.Media.DATA};
+        Cursor cursor = getContentResolver().query(contentUri, proj, null, null, null);
+        int column_index = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
+        cursor.moveToFirst();
+        return cursor.getString(column_index);
+    }
+
+    public Account getData(){
+        return new Account((String)name.getText(),(String)bio.getText(),profilePic,image1,image2);
+    }
+
     /**
      * Attempts to sign in or register the account specified by the login form.
      * If there are form errors (invalid email, missing fields, etc.), the
