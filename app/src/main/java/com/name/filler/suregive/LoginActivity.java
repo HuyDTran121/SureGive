@@ -7,8 +7,12 @@ import android.annotation.TargetApi;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.provider.MediaStore;
 import android.support.annotation.NonNull;
+import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.Snackbar;
+import android.support.design.widget.TextInputEditText;
 import android.support.v7.app.AppCompatActivity;
 import android.app.LoaderManager.LoaderCallbacks;
 
@@ -22,10 +26,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.inputmethod.EditorInfo;
@@ -33,6 +37,7 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -70,6 +75,31 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private View mLoginFormView;
     private TextView createAccount;
     private Button mEmailSignInButton;
+    //New elements after clicking create account
+    private Button giver;
+    private Button receiver;
+    private TextView or;
+    //Giver or Receiver?
+    private static final int GIVER = 0;
+    private static final int RECEIVER = 1;
+    private int mode;
+    //Receiver input elements
+    private TextView name;
+    private TextInputEditText nameInput;
+    private TextView bio;
+    private TextInputEditText bioInput;
+    private Button addPhoto;
+    private Button next;
+    //Layouts
+    private LinearLayout verticalLayout;
+    private LinearLayout giveOrReceive;
+    private LinearLayout options;
+    private LinearLayout receiverInput;
+    //Images
+    private Bitmap profilePic;
+    private Bitmap image1;
+    private Bitmap image2;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,7 +112,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         populateAutoComplete();
 
         //Password Input
-        mPasswordView = (EditText) findViewById(R.id.password);mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+        mPasswordView = (EditText) findViewById(R.id.password);
+        mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView textView, int id, KeyEvent keyEvent) {
                 if (id == EditorInfo.IME_ACTION_DONE || id == EditorInfo.IME_NULL) {
@@ -113,13 +144,20 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
-        SharedPreferences sharedPreferences = getSharedPreferences("Login",MODE_PRIVATE);
-        if(sharedPreferences.getString("username",null) != null){
+        SharedPreferences sharedPreferences = getSharedPreferences("Login", MODE_PRIVATE);
+        if (sharedPreferences.getString("username", null) != null) {
             //Autofill
             mEmailView.setText(sharedPreferences.getString("username", null));
             mPasswordView.setText(sharedPreferences.getString("password", null));
             attemptLogin();
         }
+        //Set up intent
+        mainActivity = new Intent(this,MainActivity.class);
+
+        //Set up layouts
+        verticalLayout = findViewById(R.id.verticalLayout);
+        options = findViewById(R.id.options);
+
     }
 
     private void populateAutoComplete() {
@@ -166,16 +204,163 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     }
 
 
-    private void createAccount(){
-        //Fade out button
-        ObjectAnimator slideRight = ObjectAnimator.ofFloat(findViewById(R.id.options), "translationX", 1300f);
+    private void createAccount() {
+        //Set up animation
+        ObjectAnimator slideRight = ObjectAnimator.ofFloat(options, "translationX", 1300f);
         slideRight.setDuration(1000);
+        //Add new horizontal layout
+        giveOrReceive = new LinearLayout(this);
+        giveOrReceive.setOrientation(LinearLayout.HORIZONTAL);
+        giveOrReceive.setGravity(Gravity.CENTER_HORIZONTAL);
+        //Giver button
+        giver = new Button(this);
+        giver.setText("Giver");
+        giver.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                giver();
+            }
+        });
+        //Receiver button
+        receiver = new Button(this);
+        receiver.setText("Receiver");
+        receiver.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                receiver();
+            }
+        });
+        //Or text
+        or = new TextView(this);
+        or.setText("or");
+        or.setPadding(30, 0, 30, 0);
+        //Add to horizontal layout
+        giveOrReceive.addView(giver);
+        giveOrReceive.addView(or);
+        giveOrReceive.addView(receiver);
+        //Slide animation and add
+        slideRight.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                //Set invisible
+                Animation disappear = new AlphaAnimation(1, 0);
+                disappear.setDuration(0);
+                giveOrReceive.startAnimation(disappear);
+                //Add fade in
+                verticalLayout.addView(giveOrReceive, 2);
+                Animation fadeIn = new AlphaAnimation(0, 1);
+                fadeIn.setDuration(700);
+                giveOrReceive.startAnimation(fadeIn);
+            }
+        });
         slideRight.start();
-        //
-
     }
 
 
+    private void giver() {
+        mode = GIVER;
+        //TODO add code to add account to server
+        //Go to map view
+        attemptLogin();
+    }
+
+    private void receiver() {
+        mode = RECEIVER;
+        //Set up animation
+        ObjectAnimator slideRight = ObjectAnimator.ofFloat(giveOrReceive, "translationX", 1300f);
+        slideRight.setDuration(1000);
+        //Set up receiverInput fields
+        receiverInput = new LinearLayout(this);
+        receiverInput.setOrientation(LinearLayout.VERTICAL);
+        //Layout Parameter
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.FILL_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        //Name
+        name = new TextView(this);
+        name.setText("Name:");
+        //Name input
+        nameInput = new TextInputEditText(this);
+        nameInput.setLayoutParams(params);
+
+        LinearLayout nameLayout = new LinearLayout(this);
+        receiverInput.addView(nameLayout);
+        nameLayout.setOrientation(LinearLayout.HORIZONTAL);
+        nameLayout.addView(name);
+        nameLayout.addView(nameInput);
+
+        //Bio
+        bio = new TextView(this);
+        bio.setText("Bio:");
+        bio.setGravity(Gravity.TOP);
+        //Bio input
+        bioInput = new TextInputEditText(this);
+        bioInput.setLayoutParams(params);
+        bioInput.setLines(2);
+
+        LinearLayout bioLayout = new LinearLayout(this);
+        receiverInput.addView(bioLayout);
+        bioLayout.setOrientation(LinearLayout.HORIZONTAL);
+        bioLayout.addView(bio);
+        bioLayout.addView(bioInput);
+        bioLayout.setGravity(Gravity.TOP);
+
+        //Instruction text
+        TextView instructions = new TextView(this);
+        instructions.setText("Please submit a profile picture of yourself");
+        receiverInput.addView(instructions);
+        //Camera button
+        params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        addPhoto = new Button(this);
+        addPhoto.setLayoutParams(params);
+        addPhoto.setGravity(Gravity.RIGHT);
+        addPhoto.setText("Add Profile Photo");
+        addPhoto.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                getPhoto();
+            }
+        });
+        receiverInput.addView(addPhoto);
+
+
+        slideRight.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                //Set invisible
+                Animation disappear = new AlphaAnimation(1, 0);
+                disappear.setDuration(0);
+                receiverInput.startAnimation(disappear);
+                //Add fade in
+                verticalLayout.addView(receiverInput, 2);
+                Animation fadeIn = new AlphaAnimation(0, 1);
+                fadeIn.setDuration(700);
+                receiverInput.startAnimation(fadeIn);
+            }
+        });
+        //Slide right
+        slideRight.start();
+
+
+    }
+
+    private void getPhoto(){
+        //TODO implement pictures
+        Intent galleryIntent = new Intent(Intent.ACTION_PICK,
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+
+        Intent cameraIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+
+        Intent chooser = new Intent(Intent.ACTION_CHOOSER);
+        chooser.putExtra(Intent.EXTRA_INTENT, galleryIntent);
+        chooser.putExtra(Intent.EXTRA_TITLE, "Get Picture");
+
+        Intent[] intentArray =  {cameraIntent};
+        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray);
+        startActivity(chooser);
+    }
     /**
      * Attempts to sign in or register the account specified by the login form.
      * If there are form errors (invalid email, missing fields, etc.), the
@@ -225,7 +410,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             showProgress(true);
             mAuthTask = new UserLoginTask(email, password);
             mAuthTask.execute((Void) null);
-            mainActivity = new Intent(this,MainActivity.class);
         }
     }
 
@@ -359,11 +543,11 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 if (pieces[0].equals(mEmail)) {
                     // Account exists, return true if the password matches.
                     boolean success = pieces[1].equals(mPassword);
-                    if(success){
+                    if (success) {
                         SharedPreferences sharedPreferences = getSharedPreferences("Login", MODE_PRIVATE);
                         SharedPreferences.Editor editor = sharedPreferences.edit();
                         editor.putString("username", mEmail);
-                        editor.putString("password",mPassword);
+                        editor.putString("password", mPassword);
                         editor.commit();
                     }
 
