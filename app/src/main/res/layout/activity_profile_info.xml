@@ -12,7 +12,7 @@
 
     <ImageView
         android:id="@+id/profile_img"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="200dp"
         android:layout_marginTop="25dp"
         android:layout_marginBottom="15dp"
@@ -34,6 +34,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Bio:"
+        android:textAlignment="center"
         android:textColor="@color/common_google_signin_btn_text_dark_focused"
         android:textSize="26sp" />
 

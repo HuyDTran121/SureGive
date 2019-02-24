@@ -90,6 +90,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+        final ImageButton camera = (ImageButton) findViewById(R.id.camera);
+        camera.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //TODO: pop up camera intent, take picture - send to server to recognize,
+                //TODO: once sent, do a loading icon until server returns profile
+                //TODO: if person recognized go into ProfileInfo otherwise make a alert/toast
+            }
+        });
+
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -150,11 +160,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             bundle.putString("name", person.getString("name"));
             bundle.putString("person_id", person.getString("person_id"));
             bundle.putString("bio", person.getString("bio"));
-            bundle.putString("profile_img", person.getString("profile_img"));
 
-//            String base64_img = person.getString("profile_img");
-//            byte[] arr = Base64.decode(base64_img, Base64.DEFAULT);
-//            bundle.putByteArray("image", arr);
+            String base64_img = person.getString("profile_img");
+            byte[] arr = Base64.decode(base64_img, Base64.DEFAULT);
+            ((MyApplication) this.getApplication()).setProfile(arr);
         }
         catch (JSONException e) {
             e.printStackTrace();

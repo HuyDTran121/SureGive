@@ -21,13 +21,18 @@ public class ProfileInfo extends AppCompatActivity {
 
         //Get the bundle
         Bundle bundle = getIntent().getExtras();
-//        byte[] byteArray = bundle.getByteArray("image");
-//
-//        Bitmap bmp = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.length);
-//        ImageView image = (ImageView) findViewById(R.id.profile_img);
+        final byte[] byteArray = ((MyApplication) this.getApplication()).getProfile();
+        final ImageView image = (ImageView) findViewById(R.id.profile_img);
 
-//        image.setImageBitmap(Bitmap.createScaledBitmap(bmp, image.getWidth(),
-//                image.getHeight(), false));
+        image.post(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap bmp = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.length);
+                int width = (int)(image.getHeight() / (double)bmp.getHeight()) * bmp.getWidth();
+                image.setImageBitmap(Bitmap.createScaledBitmap(bmp, width,
+                        image.getHeight(), false));
+            }
+        });
 
         TextView text = (TextView) findViewById(R.id.profile_name);
         text.setText(bundle.getString("name"));
