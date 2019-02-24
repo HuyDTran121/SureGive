@@ -21,10 +21,10 @@
         android:id="@+id/camera"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="20dp"
         android:layout_marginEnd="16dp"
-        android:background="@drawable/camera_white"
-        android:src="@drawable/camera_white"
+        android:background="@drawable/camera_black"
+        android:src="@drawable/camera_black"
         app:layout_constraintEnd_toStartOf="@+id/sync"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -32,10 +32,10 @@
         android:id="@+id/sync"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="48dp"
-        android:background="@drawable/sync_white"
-        android:src="@drawable/sync_white"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="56dp"
+        android:background="@drawable/sync_black"
+        android:src="@drawable/sync_black"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 

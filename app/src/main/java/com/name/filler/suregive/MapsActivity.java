@@ -1,5 +1,6 @@
 package com.name.filler.suregive;
 
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Looper;
@@ -8,7 +9,10 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.util.Base64;
 import android.util.Log;
+import android.view.View;
+import android.widget.ImageButton;
 
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -19,7 +23,6 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -27,16 +30,20 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import org.json.*;
+import com.loopj.android.http.*;
 
+import java.util.HashMap;
 import java.util.List;
 
+import cz.msebera.android.httpclient.Header;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback , GoogleMap.OnInfoWindowClickListener {
 
     private static final String TAG = MapsActivity.class.getSimpleName();
 
     private GoogleMap mMap;
-    private CameraPosition mCameraPosition;
 
     // The entry point to the Fused Location Provider.
     private FusedLocationProviderClient mFusedLocationProviderClient;
@@ -44,7 +51,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     // A default location (Sydney, Australia) and default zoom to use when location permission is
     // not granted.
     private final LatLng mDefaultLocation = new LatLng(-33.8523341, 151.2106085);
-    private static final int DEFAULT_ZOOM = 15;
+    private static final int DEFAULT_ZOOM = 18;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private boolean mLocationPermissionGranted;
 
@@ -53,10 +60,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Location mLastKnownLocation;
     private LocationRequest mLocationRequest;
 
+    //HashMap for storing marker info
+    private HashMap<Marker, JSONObject> markerInfo = new HashMap<>();
+
     // Keys for storing activity state.
     private static final String KEY_CAMERA_POSITION = "camera_position";
     private static final String KEY_LOCATION = "location";
-    Marker mCurrLocationMarker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,13 +74,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Retrieve location and camera position from saved instance state.
         if (savedInstanceState != null) {
             mLastKnownLocation = savedInstanceState.getParcelable(KEY_LOCATION);
-            mCameraPosition = savedInstanceState.getParcelable(KEY_CAMERA_POSITION);
         }
 
         setContentView(R.layout.activity_maps);
 
         // Construct a FusedLocationProviderClient.
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+
+        final ImageButton button = (ImageButton) findViewById(R.id.sync);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                button.setVisibility(View.INVISIBLE);
+                getNearbyPeople(mLastKnownLocation.getLatitude(), mLastKnownLocation.getLongitude());
+            }
+        });
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -106,6 +123,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(18));
+        mMap.setOnInfoWindowClickListener(this);
+
         // Prompt the user for permission.
         getLocationPermission();
 
@@ -115,6 +135,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Get the current location of the device and set the position of the map.
         getDeviceLocation();
 
+    }
+
+    @Override
+    public void onInfoWindowClick(Marker marker) {
+        Intent i2 = new Intent(this, ProfileInfo.class);
+        //Create the bundle
+        Bundle bundle = new Bundle();
+
+        //Add your data to bundle
+        JSONObject person = markerInfo.get(marker);
+
+        try {
+            bundle.putString("name", person.getString("name"));
+            bundle.putString("person_id", person.getString("person_id"));
+            bundle.putString("bio", person.getString("bio"));
+            bundle.putString("profile_img", person.getString("profile_img"));
+
+//            String base64_img = person.getString("profile_img");
+//            byte[] arr = Base64.decode(base64_img, Base64.DEFAULT);
+//            bundle.putByteArray("image", arr);
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        //Add the bundle to the intent
+        i2.putExtras(bundle);
+        startActivity(i2);
+        overridePendingTransition( R.anim.slide_in, R.anim.slide_out );
     }
 
     /**
@@ -129,8 +178,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (mLocationPermissionGranted) {
                 Task<Location> locationResult = mFusedLocationProviderClient.getLastLocation();
                 mLocationRequest = new LocationRequest();
-                mLocationRequest.setInterval(120000); // two minute interval
-                mLocationRequest.setFastestInterval(120000);
+                mLocationRequest.setInterval(12000); // two minute / 10 interval
+                mLocationRequest.setFastestInterval(12000);
                 mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
                 mFusedLocationProviderClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
                 locationResult.addOnCompleteListener(this, new OnCompleteListener<Location>() {
@@ -141,7 +190,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             mLastKnownLocation = task.getResult();
                             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
                                     new LatLng(mLastKnownLocation.getLatitude(),
-                                            mLastKnownLocation.getLongitude()), DEFAULT_ZOOM));
+                                            mLastKnownLocation.getLongitude()), 18));
+
+                            getNearbyPeople(mLastKnownLocation.getLatitude(),
+                                    mLastKnownLocation.getLongitude());
                         } else {
                             Log.d(TAG, "Current location is null. Using defaults.");
                             Log.e(TAG, "Exception: %s", task.getException());
@@ -157,6 +209,47 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    public void getNearbyPeople(double lat, double lon) {
+        RequestParams params = new RequestParams();
+        params.put("lat", lat);
+        params.put("long", lon);
+        Log.e("PARAMS: ", params.toString());
+        ServerRestClient.post("closest", params, new JsonHttpResponseHandler() {
+            @Override
+            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                try {
+                    JSONArray arr = response.getJSONArray("response");
+                    mMap.clear();
+                    markerInfo.clear();
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject person = arr.getJSONObject(i);
+                        JSONObject loc = person.getJSONObject("location");
+                        String name = person.getString("name");
+                        LatLng latLng = new LatLng(loc.getDouble("lat"), loc.getDouble("long"));
+                        MarkerOptions markerOptions = new MarkerOptions();
+                        markerOptions.position(latLng);
+                        markerOptions.title(name);
+                        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_MAGENTA));
+                        Marker m = mMap.addMarker(markerOptions);
+                        markerInfo.put(m, person);
+                    }
+                    final ImageButton button = (ImageButton) findViewById(R.id.sync);
+                    button.setVisibility(View.VISIBLE);
+                }
+                catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
+                super.onFailure(statusCode, headers, responseString, throwable);
+                final ImageButton button = (ImageButton) findViewById(R.id.sync);
+                button.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
     LocationCallback mLocationCallback = new LocationCallback() {
         @Override
         public void onLocationResult(LocationResult locationResult) {
@@ -166,20 +259,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Location location = locationList.get(locationList.size() - 1);
                 Log.i("MapsActivity", "Location: " + location.getLatitude() + " " + location.getLongitude());
                 mLastKnownLocation = location;
-                if (mCurrLocationMarker != null) {
-                    mCurrLocationMarker.remove();
-                }
 
                 //Place current location marker
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                MarkerOptions markerOptions = new MarkerOptions();
-                markerOptions.position(latLng);
-                markerOptions.title("Current Position");
-                markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_MAGENTA));
-                mCurrLocationMarker = mMap.addMarker(markerOptions);
 
-                //move map camera
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 11));
             }
         }
     };
@@ -246,4 +329,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Log.e("Exception: %s", e.getMessage());
         }
     }
+
+
 }
+
