@@ -30,6 +30,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -44,11 +45,18 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.loopj.android.http.JsonHttpResponseHandler;
+import com.loopj.android.http.RequestParams;
+
+import org.json.JSONObject;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import cz.msebera.android.httpclient.Header;
 
 import static android.Manifest.permission.READ_CONTACTS;
 
@@ -346,7 +354,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         submit.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                //TODO click submit
+                registerProfile(name.getText().toString(), bio.getText().toString());
+                //TODO: add loading icon, then remove in onSuccess
             }
         });
         receiverInput.addView(submit);
@@ -371,6 +380,21 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
 
     }
+
+    public void registerProfile(String name, String bio) {
+        RequestParams params = new RequestParams();
+        params.put("name", name);
+        params.put("bio", bio);
+        params.put("profile_img", profilePic);
+        ServerRestClient.post("addprofile", params, new JsonHttpResponseHandler() {
+            @Override
+            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                super.onSuccess(statusCode, headers, response);
+                //TODO: remove loading screen, sign out and reset activity
+            }
+        });
+    }
+
     private Uri getCaptureImageOutputUri() {
         Uri outputFileUri = null;
         File getImage = getExternalFilesDir("");
