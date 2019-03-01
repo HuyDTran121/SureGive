@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -15,8 +16,6 @@ import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.design.widget.TextInputEditText;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.app.LoaderManager.LoaderCallbacks;
 
@@ -29,8 +28,8 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.text.InputType;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -48,9 +47,11 @@ import android.widget.TextView;
 import com.loopj.android.http.JsonHttpResponseHandler;
 import com.loopj.android.http.RequestParams;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -81,7 +82,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      * Keep track of the login task to ensure we can cancel it if requested.
      */
     private UserLoginTask mAuthTask = null;
-    private Intent mainActivity;
+    private Intent mapsActivity;
 
     // UI references.
     private AutoCompleteTextView mEmailView;
@@ -104,6 +105,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private TextInputEditText nameInput;
     private TextView bio;
     private TextInputEditText bioInput;
+    private TextView instructions;
     private Button addPhoto;
     private Button submit;
     //Layouts
@@ -113,9 +115,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private LinearLayout receiverInput;
     //Images
     private byte[] profilePic;
-    private byte[] image1;
-    private byte[] image2;
 
+    private ProgressDialog dialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,7 +169,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             attemptLogin();
         }
         //Set up intent
-        mainActivity = new Intent(this,MainActivity.class);
+        mapsActivity = new Intent(this,MapsActivity.class);
 
         //Set up layouts
         verticalLayout = findViewById(R.id.verticalLayout);
@@ -296,6 +297,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         authKey = new TextInputEditText(this);
         authKey.setLayoutParams(params);
         authKey.setHint("Authentication Key");
+        authKey.setRawInputType(InputType.TYPE_TEXT_VARIATION_PASSWORD);
         receiverInput.addView(authKey);
 
         //Name
@@ -330,7 +332,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         bioLayout.setGravity(Gravity.TOP);
 
         //Instruction text
-        TextView instructions = new TextView(this);
+        instructions = new TextView(this);
         instructions.setText("Please submit a profile picture of yourself");
         receiverInput.addView(instructions);
         //Camera button
@@ -342,31 +344,31 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         addPhoto.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                getProfilePic();
+                getPic();
             }
         });
         receiverInput.addView(addPhoto);
-
+        //Animation setup
+        final Animation disappear = new AlphaAnimation(1, 0);
+        disappear.setDuration(0);
         //Submit
         submit = new Button(this);
         submit.setText("Submit");
         submit.setLayoutParams(params);
+        submit.startAnimation(disappear);
         submit.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                registerProfile(name.getText().toString(), bio.getText().toString());
+                registerProfile(nameInput.getText().toString(), bioInput.getText().toString());
                 //TODO: add loading icon, then remove in onSuccess
             }
         });
-        receiverInput.addView(submit);
 
         slideRight.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
                 //Set invisible
-                Animation disappear = new AlphaAnimation(1, 0);
-                disappear.setDuration(0);
                 receiverInput.startAnimation(disappear);
                 //Add fade in
                 verticalLayout.addView(receiverInput, 3);
@@ -385,14 +387,49 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         RequestParams params = new RequestParams();
         params.put("name", name);
         params.put("bio", bio);
-        params.put("profile_img", profilePic);
+        params.put("profile_img", new ByteArrayInputStream(profilePic), "profile_img");
         ServerRestClient.post("addprofile", params, new JsonHttpResponseHandler() {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                 super.onSuccess(statusCode, headers, response);
-                //TODO: remove loading screen, sign out and reset activity
+                dialog.hide();
+                Intent intent = getIntent();
+                finish();
+                startActivity(intent);
+            }
+
+            @Override
+            public void onSuccess(int statusCode, Header[] headers, JSONArray response) {
+                super.onSuccess(statusCode, headers, response);
+                dialog.hide();
+                Intent intent = getIntent();
+                finish();
+                startActivity(intent);
+            }
+
+            @Override
+            public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
+                super.onFailure(statusCode, headers, responseString, throwable);
+                dialog.hide();
+                Intent intent = getIntent();
+                finish();
+                startActivity(intent);
+            }
+
+            @Override
+            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
+                super.onFailure(statusCode, headers, throwable, errorResponse);
+                dialog.hide();
+                Intent intent = getIntent();
+                finish();
+                startActivity(intent);
             }
         });
+        dialog=new ProgressDialog(this);
+        dialog.setMessage("Creating Profile (this may take a minute)");
+        dialog.setCancelable(false);
+        dialog.setInverseBackgroundForced(false);
+        dialog.show();
     }
 
     private Uri getCaptureImageOutputUri() {
@@ -446,7 +483,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         return chooserIntent;
     }
-    private void getProfilePic(){
+    private void getPic(){
         //TODO implement pictures
 
         //startActivity(chooser);
@@ -471,7 +508,39 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                         BufferedInputStream inputStream = new BufferedInputStream(new FileInputStream(file));
                         inputStream.read(byteArr,0,byteArr.length);
                         inputStream.close();
-                        profilePic = byteArr;
+                        if(profilePic == null){
+                            profilePic = byteArr;
+                        }
+
+                        Animation disappear = new AlphaAnimation(1, 0);
+                        disappear.setDuration(1000);
+                        Animation disappear2 = new AlphaAnimation(1, 0);
+                        disappear2.setDuration(1000);
+                        disappear.setAnimationListener(new Animation.AnimationListener() {
+                            @Override
+                            public void onAnimationStart(Animation animation) {
+
+                            }
+
+                            @Override
+                            public void onAnimationEnd(Animation animation) {
+                                //Add fade in
+                                receiverInput.addView(submit, 3);
+                                Animation fadeIn = new AlphaAnimation(0, 1);
+                                fadeIn.setDuration(500);
+                                submit.startAnimation(fadeIn);
+                            }
+
+                            @Override
+                            public void onAnimationRepeat(Animation animation) {
+
+                            }
+                        });
+                        addPhoto.startAnimation(disappear);
+                        instructions.startAnimation(disappear2);
+                        instructions.setAlpha(0);
+                        addPhoto.setAlpha(0);
+
 
                     }
                     catch (Exception e){
@@ -503,9 +572,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         return cursor.getString(column_index);
     }
 
-    public Account getData(){
-        return new Account((String)name.getText(),(String)bio.getText(),profilePic,image1,image2);
-    }
 
     /**
      * Attempts to sign in or register the account specified by the login form.
@@ -714,7 +780,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
                 //SUCCESSFUL LOGIN
                 //Intent to go to MainActivity
-                startActivity(mainActivity);
+                startActivity(mapsActivity);
 
                 finish();
             } else {

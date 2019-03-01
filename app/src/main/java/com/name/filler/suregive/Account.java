@@ -5,13 +5,11 @@ public class Account {
     public String bio;
     public byte[] profileImage;
     public byte[] image1;
-    public byte[] image2;
 
-    public Account(String name, String bio, byte[] profileImage, byte[] image1, byte[] image2) {
+    public Account(String name, String bio, byte[] profileImage, byte[] image1) {
         this.name = name;
         this.bio = bio;
         this.profileImage = profileImage;
         this.image1 = image1;
-        this.image2 = image2;
     }
 }

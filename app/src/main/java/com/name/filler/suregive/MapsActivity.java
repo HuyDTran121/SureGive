@@ -1,8 +1,10 @@
 package com.name.filler.suregive;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
@@ -41,6 +43,7 @@ import org.json.*;
 import com.loopj.android.http.*;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -80,6 +83,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //Image to search for
     private byte[] searchImg;
+    private ProgressDialog dialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,6 +116,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 //TODO: pop up camera intent, take picture - send to server to recognize,
                 //TODO: once sent, do a loading icon until server returns profile
                 //TODO: if person recognized go into ProfileInfo otherwise make a alert/toast
+            }
+        });
+
+        final ImageButton exit = (ImageButton) findViewById(R.id.exit);
+        final MapsActivity context = this;
+        exit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                onBackPressed();
+                Intent intent = new Intent(context, LoginActivity.class);
+                startActivity(intent);
             }
         });
 
@@ -425,7 +440,57 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         inputStream.read(byteArr,0,byteArr.length);
                         inputStream.close();
                         searchImg = byteArr;
+                        RequestParams params = new RequestParams();
+                        params.put("search_img", new ByteArrayInputStream(searchImg), "search_img");
+                        final Intent i2 = new Intent(this, ProfileInfo.class);
+                        //Create the bundle
+                        final Bundle bundle = new Bundle();
+                        final MyApplication app = ((MyApplication) this.getApplication());
+                        ServerRestClient.post("/findperson", params, new JsonHttpResponseHandler() {
+                            @Override
+                            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                                super.onSuccess(statusCode, headers, response);
+                                dialog.hide();
+                                try {
+                                    JSONArray res = response.getJSONArray("response");
+                                    if (res.length() > 0) {
+                                        JSONObject person = res.getJSONObject(0);
+                                        bundle.putString("name", person.getString("name"));
+                                        bundle.putString("person_id", person.getString("person_id"));
+                                        bundle.putString("bio", person.getString("bio"));
 
+                                        String base64_img = person.getString("profile_img");
+                                        byte[] arr = Base64.decode(base64_img, Base64.DEFAULT);
+                                        app.setProfile(arr);
+                                        //Add the bundle to the intent
+                                        i2.putExtras(bundle);
+                                        startActivity(i2);
+                                        overridePendingTransition( R.anim.slide_in, R.anim.slide_out );
+                                    }
+                                }
+                                catch (JSONException e) {
+                                    e.printStackTrace();
+                                }
+
+                            }
+
+                            @Override
+                            public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
+                                super.onFailure(statusCode, headers, responseString, throwable);
+                                dialog.hide();
+                            }
+
+                            @Override
+                            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
+                                super.onFailure(statusCode, headers, throwable, errorResponse);
+                                dialog.hide();
+                            }
+                        });
+                        dialog=new ProgressDialog(this);
+                        dialog.setMessage("Searching Database (this may take a minute)");
+                        dialog.setCancelable(false);
+                        dialog.setInverseBackgroundForced(false);
+                        dialog.show();
                     }
                     catch (Exception e){
                         e.printStackTrace();
@@ -452,6 +517,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         int column_index = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
         cursor.moveToFirst();
         return cursor.getString(column_index);
+    }
+
+
+
+    @Override
+    public void onBackPressed() {
+        SharedPreferences sharedPreferences = getSharedPreferences("Login",MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString("username",null);
+        editor.putString("password",null);
+        editor.commit();
     }
 }
 
